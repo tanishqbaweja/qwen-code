@@ -16,7 +16,7 @@ import java.util.Map;
 
 final class WorkspaceOperations {
     enum Kind {
-        WORKSPACE_RECOVERY, WORKSPACE_OPERATOR_RECOVERY, STORAGE_MIGRATION, CSI_RETIREMENT, WORKSPACE_RETIREMENT, CHILD_WORKSPACE
+        WORKSPACE_RECOVERY, WORKSPACE_OPERATOR_RECOVERY, STORAGE_MIGRATION, CSI_RETIREMENT, WORKSPACE_RETIREMENT, CHILD_WORKSPACE, SESSION_WORKTREE
     }
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -63,7 +63,7 @@ final class WorkspaceOperations {
                     com.alibaba.qwen.code.runtimebroker.JdbcRuntimeBindingRepository.storageAliasKey(tenant, storage));
             if (aliases.size() == 1 && "LOCAL".equals(aliases.getFirst())) {
                 physical = LocalStorageOwners.key(jdbc, tenant, storage);
-                if (kind == Kind.CHILD_WORKSPACE) {
+                if (kind == Kind.CHILD_WORKSPACE || kind == Kind.SESSION_WORKTREE) {
                     WorkspaceMigrationAdmission.requireOpen(jdbc, tenant, storage);
                 }
             }
@@ -178,6 +178,7 @@ final class WorkspaceOperations {
                     ChildWorkspaceStore.MERGING, ChildWorkspaceStore.APPLYING, ChildWorkspaceStore.APPLIED,
                     ChildWorkspaceStore.MERGED, ChildWorkspaceStore.CONFLICTED, ChildWorkspaceStore.DISCARDING,
                     ChildWorkspaceStore.DISCARDED, ChildWorkspaceStore.FAILED, ChildWorkspaceStore.BLOCKED);
+            case SESSION_WORKTREE -> java.util.Set.of("PREPARING", "READY", "FAILED", "BLOCKED", "REMOVING", "REMOVED");
         };
         if (!allowed.contains(state)) {
             throw new IllegalArgumentException("Unknown state for Workspace operation " + kind);
@@ -198,7 +199,7 @@ final class WorkspaceOperations {
                     || "RETIRED".equals(from) && "PREPARING".equals(to)
                     || "PREPARING".equals(from) && "PREPARED".equals(to)
                     || "PREPARED".equals(from) && "COMPLETED".equals(to));
-            case CSI_RETIREMENT, WORKSPACE_RETIREMENT, CHILD_WORKSPACE -> false;
+            case CSI_RETIREMENT, WORKSPACE_RETIREMENT, CHILD_WORKSPACE, SESSION_WORKTREE -> false;
         };
         if (!allowed) {
             throw new IllegalStateException("Workspace operation transition conflicts");
